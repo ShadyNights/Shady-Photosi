@@ -1,0 +1,1819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shady Photo Gallery</title>
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    /* --------------- THEME VARIABLES --------------- */
+    :root {
+      --bg: #f4f4f4;
+      --fg: #333;
+      --accent: #333;
+      --skeleton-bg: #ccc;
+    }
+    [data-theme="dark"] {
+      --bg: #121212;
+      --fg: #f4f4f4;
+      --accent: #ffffff; /* White accent for dark mode */
+      --skeleton-bg: #444;
+    }
+    [data-theme="sepia"] {
+      --bg: #f4ecd8;
+      --fg: #5b4636;
+      --accent: #5b4636;
+      --skeleton-bg: #d4cbb8;
+    }
+    [data-theme="neon"] {
+      --bg: #000000;
+      --fg: #00ff00;
+      --accent: #00ff00;
+      --skeleton-bg: #004400;
+    }
+
+    /* --------------- GLOBAL RESETS --------------- */
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      transition: background 0.3s, color 0.3s;
+      line-height: 1.6;
+    }
+    header,
+    .controls,
+    .tags { /* Settings now handled separately below */
+      padding: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center; /* Align items vertically */
+    }
+    header {
+      justify-content: space-between;
+      background: var(--accent);
+      color: var(--bg);
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    header h1 img {
+      height: 1.5em; /* Adjust icon size relative to text */
+      vertical-align: middle;
+    }
+    nav a,
+    nav button,
+    .tags button,
+    .settings button {
+      background: none;
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      padding: 0.35rem 0.75rem;
+      border-radius: 4px;
+      transition: background 0.2s, color 0.2s, opacity 0.2s;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+    nav button:hover:not(.active-tab) {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    nav button.active-tab {
+      background: var(--bg);
+      color: var(--accent);
+      font-weight: bold;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    button:focus-visible {
+      outline: 2px solid var(--fg); /* Accent color for focus outline */
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+
+    /* Theme Button Specific Styles */
+    #themeBtn {
+        font-size: 1.3rem; /* Make the emoji larger */
+        padding: 0.35rem 0.6rem; /* Adjust padding for icon-only button */
+        width: 40px; /* Fixed width to prevent jumping */
+        height: 40px; /* Fixed height */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* Tooltip styles */
+    [data-tooltip] {
+        position: relative;
+    }
+    [data-tooltip]:hover::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 0.4em 0.8em;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        bottom: calc(100% + 5px); /* Position above element with small gap */
+        left: 50%;
+        transform: translateX(-50%);
+        pointer-events: none;
+        animation: fadeIn 0.3s forwards;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateX(-50%) translateY(5px); }
+        to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+
+    /* --------------- SEARCH / FILTERS --------------- */
+    .controls {
+      background: var(--bg);
+      border-bottom: 1px solid var(--skeleton-bg);
+      padding-bottom: 1.5rem; /* More space below controls */
+    }
+    .controls label {
+        font-weight: bold;
+        color: var(--fg);
+        margin-right: 0.3rem;
+    }
+    .controls input[type="text"],
+    .controls select,
+    .settings input[type="text"],
+    .settings select {
+      padding: 0.6rem 0.8rem;
+      border: 1px solid var(--skeleton-bg);
+      border-radius: 4px;
+      font-size: 1rem;
+      background: var(--bg);
+      color: var(--fg);
+      transition: border-color 0.2s;
+    }
+    .controls input[type="text"]:focus,
+    .controls select:focus,
+    .settings input[type="text"]:focus,
+    .settings select:focus {
+        border-color: var(--accent);
+        outline: none;
+    }
+    .controls button {
+        padding: 0.6rem 1.2rem;
+        background-color: var(--accent);
+        color: var(--bg);
+        border-radius: 4px;
+        font-weight: bold;
+        transition: background-color 0.2s, opacity 0.2s;
+    }
+    .controls button:hover {
+        opacity: 0.9;
+    }
+    #searchInputWrapper {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        flex-grow: 1;
+        max-width: 400px; /* Limit search input width */
+        position: relative;
+    }
+    #searchInput {
+        flex-grow: 1;
+        padding-right: 70px; /* Make space for 'Cancel' button */
+    }
+    #clearSearchBtn {
+        position: absolute;
+        right: 0.5rem; /* Adjust positioning slightly */
+        top: 50%;
+        transform: translateY(-50%);
+        background: var(--skeleton-bg); /* Give it a background */
+        color: var(--fg); /* Text color */
+        border: 1px solid var(--skeleton-bg);
+        cursor: pointer;
+        font-size: 0.85em; /* Smaller font for text */
+        padding: 0.2em 0.5em; /* Adjust padding for text */
+        line-height: 1;
+        opacity: 0.8; /* Slightly less opaque */
+        border-radius: 4px; /* Make it look like a button */
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        transition: background 0.2s, color 0.2s, opacity 0.2s;
+    }
+    #clearSearchBtn:hover {
+        background: var(--fg); /* Hover effect */
+        color: var(--bg);
+        opacity: 1;
+    }
+    #autocomplete {
+        position: absolute;
+        background: var(--bg);
+        border: 1px solid var(--skeleton-bg);
+        border-top: none;
+        z-index: 500;
+        width: calc(100% - 1rem); /* Match search input width */
+        max-width: 390px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        margin-top: -0.5rem; /* Overlap with input border */
+        border-radius: 0 0 4px 4px;
+    }
+    #autocomplete div {
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    #autocomplete div:hover {
+        background: var(--skeleton-bg);
+    }
+    .date-filter-group {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+
+    /* --------------- TAG FILTERS --------------- */
+    .tags {
+      justify-content: center;
+      background: var(--bg);
+      border-bottom: 1px solid var(--skeleton-bg);
+      padding-top: 0; /* Align with controls padding */
+      padding-bottom: 1.5rem;
+    }
+    .tags button {
+      background: var(--fg);
+      color: var(--bg);
+      border-radius: 20px;
+      padding: 0.35rem 1rem;
+      font-size: 0.85rem;
+      border: 1px solid var(--fg);
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+      white-space: nowrap; /* Prevent tags from breaking */
+    }
+    .tags button:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--bg);
+    }
+    .tags button.active-tag {
+      background: var(--accent);
+      color: var(--bg);
+      border-color: var(--accent);
+      font-weight: bold;
+    }
+
+    /* --------------- SETTINGS --------------- */
+    .settings {
+      padding: 1.5rem 1rem;
+      background: var(--bg);
+      border-bottom: 1px solid var(--skeleton-bg);
+      display: flex; /* Changed to flex container */
+      flex-direction: column; /* Stack items vertically */
+      gap: 1rem; /* Space between stacked items */
+      align-items: flex-start; /* Changed to flex-start for left alignment */
+    }
+    .settings h2 { /* New style for settings heading */
+        margin-top: 0;
+        margin-bottom: 1rem;
+        color: var(--accent);
+        text-align: center; /* Center the heading text */
+        width: 100%; /* Make heading take full width */
+        font-size: 1.6rem;
+    }
+
+    /* Settings Action Buttons (Reset, Download, Undo) */
+    .settings button {
+        padding: 0.6rem 1.2rem;
+        border-radius: 4px;
+        font-weight: bold;
+        transition: background-color 0.2s, opacity 0.2s;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        color: var(--bg); /* Default text color for these buttons */
+        margin-top: 0.5rem; /* Add some space above buttons if stacked */
+        width: 100%; /* Make buttons take full width of their max-width container */
+        max-width: 300px; /* Consistent max-width */
+    }
+    .settings button:hover {
+        opacity: 0.9;
+    }
+    /* Specific styles for different action buttons */
+    .settings #resetFavoritesBtn {
+        background-color: #d9534f; /* Red for warning/destructive action */
+    }
+    .settings #bulkDownloadBtn {
+        background-color: #5cb85c; /* Green for success/primary action */
+    }
+    .settings #undoLastActionBtn {
+        background-color: #f0ad4e; /* Orange for secondary/undo action */
+    }
+
+    /* NEW: Styling for Autoplay, Compact View, Blur NSFW buttons */
+    .settings .setting-toggle-btn {
+        background-color: var(--skeleton-bg); /* Default inactive background */
+        color: var(--fg); /* Default inactive text color */
+        text-align: left; /* Align text to the left */
+        justify-content: space-between; /* To push the "ON/OFF" indicator to the right */
+        display: flex; /* Enable flex properties */
+        align-items: center; /* Vertically center content */
+        padding: 0.8rem 1.2rem; /* Slightly more padding for button feel */
+        border: 1px solid var(--skeleton-bg); /* Subtle border */
+        cursor: pointer;
+        width: 100%;
+        max-width: 300px;
+        border-radius: 4px;
+        font-weight: bold;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        transition: background-color 0.2s, opacity 0.2s, color 0.2s, border-color 0.2s;
+    }
+    .settings .setting-toggle-btn:hover {
+        opacity: 0.9;
+        /* You might want a subtle hover color change here */
+        background-color: var(--skeleton-bg); /* Keep base color or slightly darken */
+    }
+    .settings .setting-toggle-btn.active {
+        background-color: var(--accent); /* Active background */
+        color: var(--bg); /* Active text color */
+        border-color: var(--accent); /* Active border color */
+    }
+    .settings .setting-toggle-btn.active:hover {
+        opacity: 0.9; /* Subtle hover for active state */
+    }
+
+
+    /* --------------- GALLERY --------------- */
+    .gallery {
+      column-count: 1;
+      column-gap: 1.5rem; /* Increased gap for better spacing */
+      padding: 1.5rem;
+    }
+    /* Responsive column counts */
+    @media (min-width: 600px) {
+      .gallery {
+        column-count: 2;
+      }
+    }
+    @media (min-width: 900px) {
+      .gallery {
+        column-count: 3;
+      }
+    }
+    @media (min-width: 1200px) {
+      .gallery {
+        column-count: 4;
+      }
+    }
+
+    /* FIX FOR COMPACT VIEW */
+    .gallery.compact {
+      column-count: 1; /* Default to 1 column for compact */
+      column-gap: 0.5rem; /* Tighter gap */
+      padding: 0.5rem; /* Reduced padding */
+    }
+    /* Adjust compact columns for larger screens, always fewer than non-compact */
+    @media (min-width: 600px) {
+      .gallery.compact {
+        column-count: 1; /* Keep 1 column for small-medium screens in compact */
+      }
+    }
+    @media (min-width: 900px) {
+      .gallery.compact {
+        column-count: 2; /* Up to 2 columns for medium-large screens in compact */
+      }
+    }
+    @media (min-width: 1200px) {
+      .gallery.compact {
+        column-count: 3; /* Up to 3 columns for very large screens in compact */
+      }
+    }
+
+
+    .item {
+      break-inside: avoid;
+      margin-bottom: 1.5rem; /* Increased margin for better spacing */
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden; /* Ensure content respects border-radius */
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+      transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    }
+    .item:hover {
+      transform: translateY(-5px); /* Lift effect */
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2); /* More prominent shadow */
+    }
+    .item img,
+    .item video {
+      width: 100%;
+      display: block;
+      border-radius: 8px; /* Consistent with item border-radius */
+      transition: transform 0.3s ease; /* Smooth zoom on hover for media */
+    }
+    .item img:hover,
+    .item video:hover {
+        transform: scale(1.03); /* Slight zoom */
+    }
+
+    /* Skeleton Loader */
+    .skeleton {
+      background: var(--skeleton-bg);
+      height: 250px; /* Slightly taller skeletons */
+      animation: pulse 1.5s infinite;
+      border-radius: 8px;
+      margin-bottom: 1.5rem; /* Match item margin */
+    }
+    @keyframes pulse {
+      0%,
+      100% {
+        opacity: 0.7; /* Smoother pulse */
+      }
+      50% {
+        opacity: 1;
+      }
+    }
+
+    .item-info {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0) 100%); /* Gradient fade */
+      color: #ffffff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem; /* More padding */
+      font-size: 0.85rem;
+      border-bottom-left-radius: 8px;
+      border-bottom-right-radius: 8px;
+      opacity: 0; /* Hidden by default */
+      transition: opacity 0.3s ease;
+    }
+    .item:hover .item-info {
+      opacity: 1; /* Visible on hover */
+    }
+    .item-info span {
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.5); /* Text shadow for readability */
+    }
+    .item-info button {
+        color: white; /* Default heart color */
+        font-size: 1.2rem;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 5px;
+        line-height: 1;
+        transition: transform 0.2s ease, color 0.2s ease;
+    }
+    .item-info button:hover {
+        transform: scale(1.2); /* Pop effect on hover */
+    }
+    .item-info button.favorited {
+        color: red; /* Red heart when favorited */
+        text-shadow: 0 0 5px red; /* Glow effect */
+    }
+
+    .badge-new {
+      position: absolute;
+      top: 10px; /* More space from edge */
+      left: 10px;
+      background: #e63946; /* More vibrant red */
+      color: #ffffff;
+      padding: 4px 8px;
+      font-size: 0.7rem;
+      border-radius: 4px;
+      font-weight: bold;
+      z-index: 10;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* --------------- LIGHTBOX --------------- */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.9); /* Darker overlay */
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 20px; /* Padding for small screens */
+    }
+    .lightbox-content {
+      max-width: 90%;
+      max-height: 90%;
+      position: relative; /* For nested controls */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: black; /* Ensure background behind media */
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    }
+    .lightbox-content img,
+    .lightbox-content video {
+      max-width: 100%;
+      max-height: 100%;
+      display: block;
+      object-fit: contain; /* Ensure media fits without cropping */
+      border-radius: 8px;
+    }
+
+    .lightbox-nav-btn,
+    #lightboxClose {
+        position: absolute;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        font-size: 2em;
+        cursor: pointer;
+        z-index: 1010;
+        border-radius: 50%;
+        width: 50px; /* Fixed size */
+        height: 50px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: background 0.2s, transform 0.2s;
+    }
+    .lightbox-nav-btn:hover,
+    #lightboxClose:hover {
+        background: rgba(0, 0, 0, 0.8);
+        transform: scale(1.05);
+    }
+    #lightboxClose {
+        top: 15px;
+        right: 15px;
+        font-size: 1.5em; /* Smaller X */
+        width: 40px;
+        height: 40px;
+    }
+    #lightboxPrev { left: 15px; top: 50%; transform: translateY(-50%); }
+    #lightboxNext { right: 15px; top: 50%; transform: translateY(-50%); }
+
+    .lightbox-info {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
+        color: white;
+        padding: 1rem;
+        font-size: 0.95rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-sizing: border-box;
+        border-bottom-left-radius: 8px;
+        border-bottom-right-radius: 8px;
+    }
+
+
+    /* --------------- TABS --------------- */
+    .tab-buttons {
+      display: flex;
+      gap: 1rem;
+      padding: 1rem;
+      border-bottom: 1px solid var(--skeleton-bg);
+      margin-bottom: 1rem;
+    }
+    .tab-content {
+      display: none;
+      padding: 0 1rem; /* Consistent padding with other sections */
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .tab-content h2 {
+        margin-top: 0;
+        padding-top: 1rem;
+        color: var(--accent);
+        text-align: center;
+        font-size: 1.8rem;
+    }
+    #noResults {
+        font-size: 1.2rem;
+        color: var(--fg);
+        opacity: 0.7;
+        margin-top: 50px;
+    }
+
+    /* History List */
+    #historyList {
+        list-style: none;
+        padding: 0;
+        max-width: 800px;
+        margin: 2rem auto;
+    }
+    #historyList li {
+        background: var(--bg);
+        border: 1px solid var(--skeleton-bg);
+        border-radius: 8px;
+        padding: 0.8rem 1.2rem;
+        margin-bottom: 0.75rem;
+        cursor: pointer;
+        transition: background 0.2s, box-shadow 0.2s;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        word-break: break-all; /* Ensure long URLs wrap */
+    }
+    #historyList li:hover {
+        background: var(--skeleton-bg);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    #historyList li:last-child {
+        margin-bottom: 0;
+    }
+
+
+    /* --------------- MISC --------------- */
+    .back-to-top {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      display: none;
+      padding: 12px; /* Larger hit area */
+      background: var(--accent);
+      color: var(--bg);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      font-size: 1.5rem;
+      line-height: 1;
+      transition: background 0.2s, transform 0.2s, opacity 0.2s;
+      border: none;
+      z-index: 999;
+    }
+    .back-to-top:hover {
+        background: var(--fg); /* Change color on hover */
+        transform: translateY(-3px);
+    }
+
+    /* Responsive: Controls stack vertically on narrow screens */
+    @media (max-width: 768px) {
+      .controls { /* Controls already handled in flex-direction: column */
+        flex-direction: column;
+        align-items: stretch; /* Stretch items to full width */
+      }
+      nav {
+        flex-direction: column;
+        gap: 0.5rem;
+        align-items: flex-end; /* Align nav items to the right */
+      }
+      #searchInputWrapper {
+          max-width: none; /* Allow search input to be full width */
+          width: 100%;
+      }
+      .date-filter-group {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .settings button { /* Ensure settings buttons stretch on small screens */
+        width: 100%;
+        max-width: none;
+      }
+      /* No specific label styles needed anymore as they are buttons */
+    }
+    @media (max-width: 480px) {
+        .lightbox-nav-btn {
+            font-size: 1.5em;
+            width: 40px;
+            height: 40px;
+            padding: 5px;
+        }
+        #lightboxClose {
+            top: 10px;
+            right: 10px;
+            width: 35px;
+            height: 35px;
+            font-size: 1.2em;
+        }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><img src="https://www.google.com/s2/favicons?domain=pexels.com" alt="Shady Photo Icon"> Shady Photo</h1>
+    <nav>
+      <button onclick="switchTab('home')" class="active-tab">Home</button>
+      <button onclick="switchTab('favorites')">Favorites</button>
+      <button onclick="switchTab('history')">History</button>
+      <button id="themeBtn" aria-label="Toggle theme" onclick="cycleTheme()" data-tooltip="Toggle Theme">
+        <span class="theme-icon">💡</span>
+      </button>
+      <button aria-label="Toggle sounds" onclick="toggleSounds()" data-tooltip="Toggle Sounds">🔊</button>
+      <button aria-label="Install app" id="installBtn" style="display:none" data-tooltip="Install App">💾</button>
+    </nav>
+  </header>
+
+  <section class="controls">
+    <label for="searchInput">Search Media:</label> <div id="searchInputWrapper">
+      <input
+        type="text"
+        id="searchInput"
+        placeholder="Search…"
+        aria-label="Search photos/videos"
+        autocomplete="off"
+        oninput="onSearchInputDebounced()"
+      />
+      <button type="button" id="clearSearchBtn" onclick="clearSearchInput()" aria-label="Clear search">Cancel</button>
+      <div id="autocomplete" role="listbox"></div>
+    </div>
+
+    <label for="typeSelect">Type:</label>
+    <select id="typeSelect" aria-label="Media type" onchange="searchMedia(true)">
+      <option value="photo">Photos</option>
+      <option value="video">Videos</option>
+      <option value="both">Both</option> </select>
+    <button onclick="searchMedia(true)">Search</button>
+
+    <label for="sortSelect">Sort By:</label>
+    <select id="sortSelect" onchange="applySort()" aria-label="Sort by">
+      <option value="none">Sort</option>
+      <option value="views">Most Viewed</option>
+      <option value="newest">Newest</option>
+    </select>
+
+    <div class="date-filter-group">
+      <label for="fromDate">From:</label>
+      <input type="date" id="fromDate" aria-label="From date" />
+      <label for="toDate">To:</label>
+      <input type="date" id="toDate" aria-label="To date" />
+      <button onclick="searchMedia(true)">Apply Dates</button>
+    </div>
+    <button onclick="shuffleGallery()">🔀 Shuffle</button>
+  </section>
+
+  <section class="tags" id="dynamicTags"></section>
+
+  <section class="settings">
+    <h2>App Settings</h2> <button id="autoplayBtn" class="setting-toggle-btn" onclick="toggleAutoplay()" aria-label="Toggle Autoplay">Autoplay: OFF</button>
+    <button id="compactViewBtn" class="setting-toggle-btn" onclick="toggleCompact()" aria-label="Toggle Compact View">Compact View: OFF</button>
+    <button id="blurNsfwBtn" class="setting-toggle-btn" onclick="toggleBlurNsfw()" aria-label="Toggle Blur NSFW">Blur NSFW: OFF</button>
+
+    <button id="resetFavoritesBtn" onclick="resetFavorites()">Reset Favorites</button>
+    <button id="bulkDownloadBtn" onclick="bulkDownload()">Download All</button>
+    <button id="undoLastActionBtn" onclick="undoLastAction()">Undo</button>
+  </section>
+
+  <div id="home" class="tab-content active">
+    <div id="gallery" class="gallery"></div>
+    <p id="noResults" style="text-align:center; display:none;">No results found.</p>
+  </div>
+  <div id="favorites" class="tab-content">
+    <h2>Your Favorites</h2>
+    <div id="favGallery" class="gallery"></div>
+    <p id="noFavorites" style="text-align:center; display:none;">No favorites added yet!</p>
+  </div>
+  <div id="history" class="tab-content">
+    <h2>Viewed History</h2>
+    <ul id="historyList"></ul>
+    <p id="noHistory" style="text-align:center; display:none;">Your viewing history is empty.</p>
+  </div>
+
+  <div
+    id="lightbox"
+    class="lightbox"
+    tabindex="-1"
+    role="dialog"
+    aria-modal="true"
+    onkeydown="lightboxKeyNav(event)"
+    onclick="closeLightbox()"
+  >
+    <button id="lightboxClose" onclick="event.stopPropagation(); closeLightbox()" aria-label="Close lightbox">✖️</button>
+    <button id="lightboxPrev" class="lightbox-nav-btn" onclick="event.stopPropagation(); navigateLightbox(-1);" aria-label="Previous media">◀️</button>
+    <div id="lightboxContent" class="lightbox-content" onclick="event.stopPropagation()"></div>
+    <button id="lightboxNext" class="lightbox-nav-btn" onclick="event.stopPropagation(); navigateLightbox(1);" aria-label="Next media">▶️</button>
+    <div id="lightboxDetails" class="lightbox-info" style="display:none;"></div>
+  </div>
+
+  <button class="back-to-top" onclick="scrollToTop()">⬆️</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+
+
+  <script>
+    /* ---------------------- CONFIG & STATE ---------------------- */
+    const apiKey = "gA503AsEZJORFqlTLCrSSj3HXq7n6V5yFo0IZq1nviq4sc1CDfZ4ELCx"; // <-- INSERT PEXELS KEY
+    let page = 1,
+      query = "trending",
+      type = "photo";
+    let isFetching = false,
+      lastFetchLen = 0,
+      debounceTimer;
+    let favorites = [],
+      historyLog = [],
+      lastAction = null;
+
+    const themes = ["light", "dark", "sepia", "neon"];
+    let themeIdx = 0;
+
+    let soundsEnabled = true,
+      trendingKeywords = ["Nature", "Tech", "People", "Animals", "City", "Food", "Travel", "Abstract"]; // Expanded keywords
+
+    // NEW global state for settings buttons
+    let autoplayEnabled = true;
+    let compactViewEnabled = false;
+    let blurNsfwEnabled = false;
+
+    // cache of last fetched items for arrow key navigation
+    let currentItems = [];
+    let currentIndex = -1;
+
+    // For date filters
+    let lastFromDate = '';
+    let lastToDate = '';
+
+
+    /* ---------------------- UTILITIES ---------------------- */
+    function showToast(msg, type = 'info') {
+      let backgroundColor = "#333";
+      if (type === 'success') backgroundColor = "#5cb85c";
+      if (type === 'error') backgroundColor = "#d9534f";
+      Toastify({
+        text: msg,
+        duration: 2500, // Slightly longer duration
+        gravity: "bottom",
+        position: "right", // Position to right
+        backgroundColor: backgroundColor,
+        stopOnFocus: true,
+        close: true // Allow closing toast
+      }).showToast();
+    }
+    function debounce(fn, delay) {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(fn, delay);
+    }
+
+    function saveState() {
+      localStorage.setItem("sp_favs", JSON.stringify(favorites));
+      localStorage.setItem("sp_history", JSON.stringify(historyLog));
+      localStorage.setItem("sp_lastId", JSON.stringify(Date.now())); // Update last check time
+      // Save settings states
+      localStorage.setItem("sp_autoplay", JSON.stringify(autoplayEnabled));
+      localStorage.setItem("sp_compactView", JSON.stringify(compactViewEnabled));
+      localStorage.setItem("sp_blurNsfw", JSON.stringify(blurNsfwEnabled));
+    }
+
+    /* ---------------------- INITIAL LOAD ---------------------- */
+    document.addEventListener("DOMContentLoaded", () => {
+      loadState();
+      applySavedTheme();
+      initializeSettingButtons(); // NEW: Initialize button states
+      registerPWA();
+      searchMedia(); // Initial fetch
+      window.addEventListener("scroll", onScroll);
+      setInterval(checkNewContent, 60000); // Check for new content every minute
+      renderFavorites(); // Display favorites on load
+      renderHistory(); // Display history on load
+    });
+
+    function loadState() {
+      favorites = JSON.parse(localStorage.getItem("sp_favs")) || [];
+      historyLog = JSON.parse(localStorage.getItem("sp_history")) || [];
+      const savedTags = JSON.parse(localStorage.getItem("sp_tags"));
+      if (savedTags) {
+        trendingKeywords = [...new Set([...trendingKeywords, ...savedTags])];
+      }
+      // Load settings states
+      autoplayEnabled = JSON.parse(localStorage.getItem('sp_autoplay')) !== false; // Default true
+      compactViewEnabled = JSON.parse(localStorage.getItem('sp_compactView')) || false;
+      blurNsfwEnabled = JSON.parse(localStorage.getItem('sp_blurNsfw')) || false;
+    }
+
+    /* ---------------------- SEARCH / FETCH ---------------------- */
+    async function searchMedia(reset = true) {
+        if (isFetching) return;
+
+        const currentQuery = document.getElementById("searchInput").value.trim();
+        const currentType = document.getElementById("typeSelect").value;
+        const from = document.getElementById("fromDate").value;
+        const to = document.getElementById("toDate").value;
+
+        // Only reset if query, type, or date range changes
+        if (reset && (currentQuery !== query || currentType !== type || from !== lastFromDate || to !== lastToDate)) {
+            page = 1;
+            document.getElementById("gallery").innerHTML = "";
+            currentItems = []; // Clear current items on new search
+        } else if (!reset && page === 1 && currentItems.length > 0) {
+            // Prevent refetching page 1 on scroll if already loaded
+            return;
+        }
+
+        query = currentQuery || "trending"; // Default to "trending" if search input is empty
+        type = currentType; // Update global type variable
+        lastFromDate = from; // Store for comparison
+        lastToDate = to;
+
+        isFetching = true;
+        lastFetchLen = 0;
+        showSkeleton();
+        document.getElementById("noResults").style.display = "none"; // Hide no results initially
+
+        let photos = [], videos = [];
+        const perPage = 20; // Number of items per "page"
+        // If type is "both", fetch half for each to maintain total perPage
+        const itemsPerType = type === "both" ? Math.floor(perPage / 2) : perPage;
+
+        const queryParams = `query=${encodeURIComponent(query)}&per_page=${itemsPerType}&page=${page}`;
+        let dateParams = '';
+        if (from) dateParams += `&min_date=${from}`;
+        if (to) dateParams += `&max_date=${to}`;
+
+        try {
+            if (type === "photo" || type === "both") {
+                const photoUrl = `/.netlify/functions/pexels?${queryParams}${dateParams}&type=photo`;
+                const photoResponse = await fetch(photoUrl);
+                if (!photoResponse.ok) throw new Error(`HTTP error fetching photos! status: ${photoResponse.status}`);
+                photos = (await photoResponse.json()).photos || [];
+
+            }
+
+            if (type === "video" || type === "both") {
+                const videoUrl = `/.netlify/functions/pexels?${queryParams}${dateParams}&type=video`;
+                const videoResponse = await fetch(videoUrl);
+                if (!videoResponse.ok) throw new Error(`HTTP error fetching videos! status: ${videoResponse.status}`);
+                videos = (await videoResponse.json()).videos || [];
+
+            }
+
+            let combinedItems = [];
+            if (type === "both") {
+                // Interleave photos and videos for a mixed display
+                const maxLength = Math.max(photos.length, videos.length);
+                for (let i = 0; i < maxLength; i++) {
+                    if (photos[i]) {
+                        photos[i].isPhoto = true; // Mark item as photo
+                        combinedItems.push(photos[i]);
+                    }
+                    if (videos[i]) {
+                        videos[i].isVideo = true; // Mark item as video
+                        combinedItems.push(videos[i]);
+                    }
+                }
+                // Shuffle to ensure good mix, not just photo-video-photo-video
+                for (let i = combinedItems.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [combinedItems[i], combinedItems[j]] = [combinedItems[j], combinedItems[i]];
+                }
+            } else if (type === "photo") {
+                combinedItems = photos.map(p => ({...p, isPhoto: true}));
+            } else { // type === "video"
+                combinedItems = videos.map(v => ({...v, isVideo: true}));
+            }
+
+            if (page === 1) {
+                currentItems = combinedItems;
+            } else {
+                currentItems = [...currentItems, ...combinedItems];
+            }
+
+            if (page === 1 && combinedItems.length === 0) {
+                document.getElementById("noResults").style.display = "block";
+            } else {
+                document.getElementById("noResults").style.display = "none";
+            }
+
+            renderItems(combinedItems);
+            dynamicTags(combinedItems);
+            lastFetchLen = combinedItems.length;
+            page++;
+            isFetching = false;
+            hideSkeleton();
+            if (combinedItems.length < perPage && page > 1) { // If fewer than per_page total, probably no more results
+               showToast("End of results reached.", "info");
+            }
+        } catch (err) {
+            console.error("Fetch error:", err);
+            showToast(`Error fetching media: ${err.message}`, "error");
+            isFetching = false;
+            hideSkeleton();
+        }
+    }
+
+
+    /* ---------------------- SKELETON LOADER ---------------------- */
+    function showSkeleton() {
+      const g = document.getElementById("gallery");
+      const frag = document.createDocumentFragment();
+      for (let i = 0; i < (window.innerWidth < 600 ? 3 : 6); i++) { // Show fewer skeletons on mobile
+        const s = document.createElement("div");
+        s.className = "skeleton";
+        frag.appendChild(s);
+      }
+      g.appendChild(frag);
+    }
+    function hideSkeleton() {
+      document.querySelectorAll(".skeleton").forEach((s) => s.remove());
+    }
+
+    /* ---------------------- RENDER ITEMS ---------------------- */
+    function renderItems(items) {
+      const g = document.getElementById("gallery");
+      const frag = document.createDocumentFragment();
+      items.forEach((item) => {
+        let src;
+        let currentItemType; // Determine if it's photo or video from the item object itself
+
+        if (item.isPhoto) {
+            src = item.src.large;
+            currentItemType = "photo";
+        } else if (item.isVideo) {
+            src = item.video_files.find(f => f.quality === 'hd' || f.quality === 'sd')?.link || item.video_files[0]?.link;
+            currentItemType = "video";
+        } else {
+            // Fallback for items that might not have the isPhoto/isVideo flag (e.g., old data, or initial load)
+            // Use the global 'type' variable as a hint.
+            // This case should be rare after the 'both' type implementation.
+            currentItemType = type;
+            src = type === "photo" ? item.src.large : item.video_files.find(f => f.quality === 'hd' || f.quality === 'sd')?.link || item.video_files[0]?.link;
+        }
+
+        if (!src) return; // Skip if no valid source found
+
+        const div = document.createElement("div");
+        div.className = "item";
+        div.setAttribute('data-id', item.id); // Store Pexels ID for blurring if needed
+
+        // NEW badge logic
+        const lastCheck = JSON.parse(localStorage.getItem("sp_lastId")) || 0;
+        // Pexels doesn't provide creation date, so using item.id as a proxy for "newness"
+        // (Assuming higher IDs are newer)
+        if (item.id > (lastCheck / 10000000000)) { // Adjusting for arbitrary 'lastId' timestamp
+          const b = document.createElement("div");
+          b.className = "badge-new";
+          b.textContent = "NEW";
+          div.appendChild(b);
+        }
+
+        // Media element
+        let mediaElement;
+        const altText = (currentItemType === "photo" ? item.alt : (item.user ? `Video by ${item.user.name}` : `Video by ${item.photographer || 'Unknown'}`)) || `Media by ${item.photographer || item.user?.name || 'Unknown'}`;
+
+
+        if (currentItemType === "photo") {
+          mediaElement = document.createElement("img");
+          mediaElement.src = src;
+          mediaElement.alt = altText;
+          mediaElement.loading = "lazy";
+          mediaElement.tabIndex = 0;
+          mediaElement.onclick = () => openLightbox(item.id, 'img');
+        } else { // currentItemType === "video"
+          mediaElement = document.createElement("video");
+          mediaElement.src = src;
+          mediaElement.alt = altText;
+          mediaElement.loading = "lazy";
+          mediaElement.controls = true; // Show controls by default
+          mediaElement.muted = true; // Mute by default in gallery view
+          // Use autoplayEnabled global variable
+          if (autoplayEnabled) {
+              mediaElement.autoplay = true;
+              mediaElement.loop = true;
+          }
+          mediaElement.tabIndex = 0;
+          mediaElement.onclick = () => openLightbox(item.id, 'video');
+        }
+        div.appendChild(mediaElement);
+
+        // Views tracking
+        const viewsKey = `views_${item.id}`;
+        const views = localStorage.getItem(viewsKey) ? +localStorage.getItem(viewsKey) : 0;
+
+        // Info bar
+        const info = document.createElement("div");
+        info.className = "item-info";
+        const isFavorited = favorites.includes(src); // Check if this specific src is favorited
+        const heartIcon = isFavorited ? '❤️' : '🤍'; // Filled vs. empty heart
+
+        info.innerHTML = `<span>${currentItemType === "photo" ? item.photographer : item.user?.name || 'Pexels User'} | 👁️ ${views}</span>
+                            <div>
+                              <button onclick="event.stopPropagation(); toggleFavorite('${src}', this)">${heartIcon}</button>
+                              <button onclick="event.stopPropagation(); downloadMedia('${src}')">⬇️</button>
+                            </div>`;
+        div.appendChild(info);
+        frag.appendChild(div);
+      });
+      g.appendChild(frag);
+    }
+
+    /* ---------------------- DYNAMIC TAGS ---------------------- */
+    function dynamicTags(items) {
+      const tagSet = new Set(trendingKeywords);
+      items.forEach((item) => {
+        const t = (item.photographer || item.user?.name);
+        if (t && t !== 'Pexels' && t.toLowerCase() !== 'unknown') tagSet.add(t); // Add photographer/user names
+        // Also add common alt text keywords if available
+        const altWords = (item.alt || '').split(' ').filter(w => w.length > 3 && !w.includes('/')).slice(0,2);
+        altWords.forEach(word => tagSet.add(word.charAt(0).toUpperCase() + word.slice(1)));
+      });
+      const container = document.getElementById("dynamicTags");
+      container.innerHTML = "";
+      const currentSearch = document.getElementById("searchInput").value;
+
+      // Limit the number of tags to 15
+      const tagsToDisplay = Array.from(tagSet).sort().slice(0, 15);
+
+      tagsToDisplay.forEach((tag) => { // Sort tags alphabetically
+        const btn = document.createElement("button");
+        btn.textContent = tag;
+        if (tag.toLowerCase() === currentSearch.toLowerCase()) { // Case-insensitive comparison
+          btn.classList.add("active-tag");
+        }
+        btn.onclick = () => {
+          document.getElementById("searchInput").value = tag;
+          searchMedia(true);
+        };
+        container.appendChild(btn);
+      });
+      localStorage.setItem("sp_tags", JSON.stringify([...tagSet]));
+    }
+
+    /* ---------------------- SCROLL / INFINITE ---------------------- */
+    function onScroll() {
+      document.querySelector(".back-to-top").style.display = window.scrollY > 300 ? "block" : "none";
+      // Fetch more content if near bottom AND not already fetching AND last fetch actually returned items
+      if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 800 && !isFetching && lastFetchLen > 0) {
+        debounce(() => searchMedia(false), 300);
+      }
+    }
+
+    function scrollToTop() {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    /* ---------------------- LIGHTBOX & NAV ---------------------- */
+    function openLightbox(itemId, kind) { // 'kind' is a hint, actual type determined from item obj
+        // Find the full item object from currentItems using its ID
+        const item = currentItems.find(i => i.id === itemId);
+        if (!item) {
+            showToast("Error: Media not found.", "error");
+            return;
+        }
+
+        currentIndex = currentItems.indexOf(item); // Set current index for navigation
+
+        // Determine the actual kind (photo/video) from the item object itself using the new flags
+        const actualKind = item.isPhoto ? 'img' : (item.isVideo ? 'video' : kind); // Fallback to passed 'kind' if flags not present
+
+        let src;
+        if (actualKind === "img") {
+            src = item.src.large;
+        } else if (actualKind === "video") {
+            src = item.video_files.find(f => f.quality === 'hd' || f.quality === 'sd')?.link || item.video_files[0]?.link;
+        } else {
+            showToast("Error: Unknown media type. Cannot open lightbox.", "error");
+            return;
+        }
+        if (!src) {
+            showToast("Error: Media source not available.", "error");
+            return;
+        }
+
+        const contentDiv = document.getElementById("lightboxContent");
+        contentDiv.innerHTML = ''; // Clear previous content
+
+        let mediaElement;
+        const altText = (actualKind === "img" ? item.alt : (item.user ? `Video by ${item.user.name}` : `Video by ${item.photographer || 'Unknown'}`)) || `Media by ${item.photographer || item.user?.name || 'Unknown'}`;
+
+
+        if (actualKind === "img") {
+            mediaElement = document.createElement("img");
+            mediaElement.src = src;
+            mediaElement.alt = altText;
+        } else { // actualKind === "video"
+            mediaElement = document.createElement("video");
+            mediaElement.src = src;
+            mediaElement.controls = true;
+            mediaElement.autoplay = true;
+            mediaElement.loop = true;
+            mediaElement.muted = false; // Unmute in lightbox
+        }
+        contentDiv.appendChild(mediaElement);
+
+        // Update lightbox details (photographer/user, views, resolution)
+        const lbDetails = document.getElementById("lightboxDetails");
+        const viewsKey = `views_${item.id}`;
+        let views = localStorage.getItem(viewsKey) ? +localStorage.getItem(viewsKey) + 1 : 1;
+        localStorage.setItem(viewsKey, views); // Increment and save views
+        
+        lbDetails.innerHTML = `<span>${actualKind === "img" ? item.photographer : item.user?.name || 'Pexels User'} | 👁️ ${views}</span>`;
+        if (item.width && item.height) {
+            lbDetails.innerHTML += `<span>${item.width}x${item.height}</span>`;
+        }
+        lbDetails.style.display = 'flex';
+
+        const lb = document.getElementById("lightbox");
+        lb.style.display = "flex";
+        lb.focus();
+        trapFocus(lb);
+
+        // Add to history only if not already the last item
+        if (historyLog[historyLog.length - 1]?.id !== item.id) {
+            historyLog.push({ id: item.id, src: src, type: actualKind, title: altText }); // Store more info, including actualKind
+            saveState();
+            renderHistory();
+        }
+        if (soundsEnabled) {
+            // Play a subtle click sound
+            const audio = new Audio('https://www.soundjay.com/buttons/beep-07.mp3'); // Example sound
+            audio.volume = 0.3;
+            audio.play();
+        }
+    }
+
+    function closeLightbox() {
+        const video = document.querySelector("#lightboxContent video");
+        if (video) {
+            video.pause();
+            video.currentTime = 0; // Reset video to beginning
+            video.muted = true; // Mute again if re-opened in gallery
+        }
+        document.getElementById("lightbox").style.display = "none";
+        // Return focus to the element that opened the lightbox (if possible)
+        const activeElement = document.activeElement;
+        if (activeElement && activeElement.tagName === 'IMG' || activeElement.tagName === 'VIDEO') {
+            activeElement.focus();
+        }
+    }
+    function lightboxKeyNav(e) {
+      if (e.key === "Escape") {
+          e.preventDefault(); // Prevent default browser behavior
+          closeLightbox();
+      }
+      if (e.key === "ArrowRight") {
+          e.preventDefault();
+          navigateLightbox(1);
+      }
+      if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          navigateLightbox(-1);
+      }
+    }
+    function navigateLightbox(dir) {
+      if (currentIndex === -1 || currentItems.length === 0) return;
+
+      let newIndex = currentIndex + dir;
+      if (newIndex < 0) newIndex = currentItems.length - 1; // Wrap around
+      if (newIndex >= currentItems.length) newIndex = 0; // Wrap around
+
+      currentIndex = newIndex;
+      const item = currentItems[currentIndex];
+      // Pass the explicit type from the item's flag for openLightbox
+      const kind = item.isPhoto ? 'img' : 'video';
+      openLightbox(item.id, kind);
+    }
+    // focus trap implementation
+    function trapFocus(el) {
+      const focusableSelectors = "button, video, img"; // Only these elements are focusable within lightbox content
+      const focusable = Array.from(el.querySelectorAll(focusableSelectors)).filter(
+        (elem) => elem.tabIndex !== -1 // Ensure element is actually focusable
+      );
+      if (!focusable.length) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      // Add a hidden focusable element before the first and after the last to cycle focus
+      const preFocus = document.createElement('span');
+      preFocus.tabIndex = 0;
+      preFocus.addEventListener('focus', () => last.focus());
+      el.prepend(preFocus);
+
+      const postFocus = document.createElement('span');
+      postFocus.tabIndex = 0;
+      postFocus.addEventListener('focus', () => first.focus());
+      el.append(postFocus);
+
+
+      // Set initial focus to the media element if available
+      const mediaInLightbox = el.querySelector('img, video');
+      if (mediaInLightbox) {
+        mediaInLightbox.focus();
+      } else {
+        first.focus();
+      }
+
+      // Cleanup function to remove temporary focus elements
+      el.dataset.hasFocusTrap = 'true'; // Mark that a trap is active
+      el.cleanupFocusTrap = () => {
+          if (preFocus.parentNode) preFocus.remove();
+          if (postFocus.parentNode) postFocus.remove();
+          delete el.cleanupFocusTrap;
+          delete el.dataset.hasFocusTrap;
+      };
+    }
+
+    // Modify closeLightbox to remove focus trap
+    const originalCloseLightbox = closeLightbox;
+    closeLightbox = () => {
+        const lb = document.getElementById("lightbox");
+        if (lb.dataset.hasFocusTrap === 'true' && lb.cleanupFocusTrap) {
+            lb.cleanupFocusTrap();
+        }
+        originalCloseLightbox();
+    };
+
+    /* ---------------------- FAVORITES & HISTORY ---------------------- */
+    function toggleFavorite(src, buttonElement) {
+      const idx = favorites.indexOf(src);
+      if (idx > -1) {
+        favorites.splice(idx, 1);
+        lastAction = { type: "del", item: src, category: "favorite" };
+        showToast("Removed from favorites", "info");
+        if (buttonElement) buttonElement.classList.remove('favorited');
+      } else {
+        favorites.push(src);
+        lastAction = { type: "add", item: src, category: "favorite" };
+        showToast("Added to favorites", "success");
+        if (buttonElement) buttonElement.classList.add('favorited');
+      }
+      saveState();
+      renderFavorites(); // Re-render favorites to reflect changes
+    }
+
+    function renderFavorites() {
+      const fg = document.getElementById("favGallery");
+      fg.innerHTML = "";
+      if (favorites.length === 0) {
+        document.getElementById("noFavorites").style.display = "block";
+        return;
+      }
+      document.getElementById("noFavorites").style.display = "none";
+
+      favorites.forEach((src) => {
+        const div = document.createElement("div");
+        div.className = "item";
+        // Simple check to determine if it's a video based on common extensions
+        const isVideo = src.match(/\.(mp4|webm|ogg)$/i);
+        const mediaKind = isVideo ? 'video' : 'img';
+        const altText = `Favorite ${mediaKind} from URL: ${src}`; // Placeholder alt text
+
+        let mediaElement;
+        if (mediaKind === "img") {
+            mediaElement = `<img src="${src}" alt="${altText}" loading="lazy" onclick="openLightboxFromUrl('${src}', 'img')" />`;
+        } else {
+            mediaElement = `<video src="${src}" alt="${altText}" controls muted loading="lazy" onclick="openLightboxFromUrl('${src}', 'video')"></video>`;
+        }
+
+        div.innerHTML = `${mediaElement}
+          <div class="item-info">
+            <span>Favorited</span>
+            <div>
+              <button onclick="event.stopPropagation(); toggleFavorite('${src}', this)" class="favorited" aria-label="Remove from favorites">🗑️</button>
+              <button onclick="event.stopPropagation(); downloadMedia('${src}')" aria-label="Download media">⬇️</button>
+            </div>
+          </div>`;
+        fg.appendChild(div);
+      });
+    }
+
+    // New function to open lightbox from a raw URL (e.g., from favorites/history)
+    function openLightboxFromUrl(src, kind) {
+        const contentDiv = document.getElementById("lightboxContent");
+        contentDiv.innerHTML = '';
+
+        let mediaElement;
+        const altText = `Media from URL: ${src}`;
+
+        if (kind === "img") {
+            mediaElement = document.createElement("img");
+            mediaElement.src = src;
+            mediaElement.alt = altText;
+        } else {
+            mediaElement = document.createElement("video");
+            mediaElement.src = src;
+            mediaElement.controls = true;
+            mediaElement.autoplay = true;
+            mediaElement.loop = true;
+            mediaElement.muted = false;
+        }
+        contentDiv.appendChild(mediaElement);
+
+        document.getElementById("lightboxDetails").style.display = 'none'; // No detailed info from URL
+        document.getElementById("lightboxPrev").style.display = 'none'; // Disable navigation
+        document.getElementById("lightboxNext").style.display = 'none';
+
+        const lb = document.getElementById("lightbox");
+        lb.style.display = "flex";
+        lb.focus();
+        trapFocus(lb);
+
+        // No history log update here as it's just opening a stored item
+        if (soundsEnabled) {
+            const audio = new Audio('https://www.soundjay.com/buttons/beep-07.mp3');
+            audio.volume = 0.3;
+            audio.play();
+        }
+    }
+
+
+    function resetFavorites() {
+      if (confirm("Are you sure you want to clear all your favorites? This cannot be undone.")) {
+        favorites = [];
+        saveState();
+        renderFavorites();
+        showToast("All favorites have been reset", "success");
+        lastAction = null; // Clear last action after a full reset
+      }
+    }
+
+    async function bulkDownload() {
+      if (favorites.length === 0) {
+        showToast("No favorites to download.", "info");
+        return;
+      }
+      showToast(`Starting download of ${favorites.length} items. This may take a while.`, "info");
+      for (const src of favorites) {
+        await new Promise(resolve => setTimeout(resolve, 500)); // Delay to prevent overwhelming browser
+        downloadMedia(src);
+      }
+      showToast("All available favorites have been queued for download.", "success");
+    }
+
+    function undoLastAction() {
+      if (!lastAction) {
+        showToast("No action to undo.", "info");
+        return;
+      }
+
+      if (lastAction.category === "favorite") {
+        if (lastAction.type === "add") {
+          favorites = favorites.filter((s) => s !== lastAction.item);
+          showToast("Favorite addition undone.", "info");
+        } else if (lastAction.type === "del") {
+          favorites.push(lastAction.item);
+          showToast("Favorite removal undone.", "success");
+        }
+      }
+      // Add more undo logic for other actions if needed
+      lastAction = null; // Clear after undo
+      saveState();
+      renderFavorites();
+      renderHistory(); // Might affect history if we track additions/removals there
+    }
+
+    function downloadMedia(src) {
+      const a = document.createElement("a");
+      a.href = src;
+      // Extract filename from URL or use a generic name
+      const filename = src.substring(src.lastIndexOf('/') + 1).split('?')[0] || 'download';
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast("Download started.", "success");
+    }
+
+    function renderHistory() {
+      const hl = document.getElementById("historyList");
+      hl.innerHTML = "";
+      if (historyLog.length === 0) {
+        document.getElementById("noHistory").style.display = "block";
+        return;
+      }
+      document.getElementById("noHistory").style.display = "none";
+
+      // Display most recent first
+      [...historyLog].reverse().forEach((logEntry) => {
+        const li = document.createElement("li");
+        li.textContent = logEntry.title || logEntry.src; // Show title if available, else URL
+        li.title = logEntry.src; // Full URL on hover
+        li.onclick = () => openLightboxFromUrl(logEntry.src, logEntry.type); // Pass type for correct media element
+        hl.appendChild(li);
+      });
+    }
+
+
+    /* ---------------------- SORT & SHUFFLE ---------------------- */
+    function applySort() {
+      const sel = document.getElementById("sortSelect").value;
+      const g = document.getElementById("gallery");
+      let items = Array.from(g.querySelectorAll(".item"));
+
+      if (sel === "views") {
+        items.sort((a, b) => {
+          const idA = a.getAttribute('data-id');
+          const idB = b.getAttribute('data-id');
+          const vA = +localStorage.getItem(`views_${idA}`) || 0;
+          const vB = +localStorage.getItem(`views_${idB}`) || 0;
+          return vB - vA; // Descending
+        });
+      } else if (sel === "newest") {
+        // Pexels API returns newest first by default when page=1
+        // For existing items, we can sort by ID (assuming higher ID is newer)
+        items.sort((a, b) => {
+            const idA = +a.getAttribute('data-id');
+            const idB = +b.getAttribute('data-id');
+            return idB - idA; // Descending
+        });
+        // Or re-fetch if we want truly new content from API for 'newest' sort
+        // searchMedia(true);
+        // return;
+      } else if (sel === "none") {
+        // Revert to original order (requires storing initial order or re-fetching)
+        // For simplicity, we'll just re-fetch for 'none' to reset any sorting
+        searchMedia(true);
+        return;
+      }
+      g.innerHTML = ""; // Clear current gallery
+      items.forEach((i) => g.appendChild(i));
+      showToast(`Gallery sorted by ${sel}`, "info");
+    }
+
+    function shuffleGallery() {
+      const g = document.getElementById("gallery"),
+        items = Array.from(g.children);
+      for (let i = items.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [items[i], items[j]] = [items[j], items[i]];
+      }
+      g.innerHTML = "";
+      items.forEach((i) => g.appendChild(i));
+      showToast("Gallery shuffled!", "info");
+    }
+
+    /* ---------------------- AUTOCOMPLETE ---------------------- */
+    function onSearchInputDebounced() {
+      debounce(() => {
+        const val = document.getElementById("searchInput").value.toLowerCase();
+        const ac = document.getElementById("autocomplete");
+        ac.innerHTML = "";
+        if (val.length < 2) {
+            ac.style.display = 'none'; // Hide if less than 2 chars
+            return;
+        }
+
+        // Combine trending keywords and cached tags
+        const allKeywords = [...new Set([...trendingKeywords, ...(JSON.parse(localStorage.getItem("sp_tags")) || [])])];
+
+        const filteredKeywords = allKeywords
+          .filter((k) => k.toLowerCase().startsWith(val))
+          .sort() // Sort alphabetically
+          .slice(0, 5); // Limit to 5 suggestions
+
+        if (filteredKeywords.length === 0) {
+            ac.style.display = 'none';
+            return;
+        }
+        ac.style.display = 'block';
+
+        filteredKeywords.forEach((k) => {
+          const div = document.createElement("div");
+          div.textContent = k;
+          div.role = "option";
+          div.onclick = () => {
+            document.getElementById("searchInput").value = k;
+            ac.innerHTML = "";
+            ac.style.display = 'none';
+            searchMedia(true);
+          };
+          ac.appendChild(div);
+        });
+      }, 200);
+    }
+    // Hide autocomplete when clicking outside
+    document.addEventListener('click', (e) => {
+        const ac = document.getElementById("autocomplete");
+        const searchInput = document.getElementById("searchInput");
+        if (!ac.contains(e.target) && e.target !== searchInput) {
+            ac.style.display = 'none';
+        }
+    });
+    // Clear search input function
+    function clearSearchInput() {
+        document.getElementById('searchInput').value = '';
+        document.getElementById('autocomplete').innerHTML = ''; // Clear autocomplete too
+        document.getElementById('autocomplete').style.display = 'none';
+        searchMedia(true); // Re-search with empty query (trending)
+        showToast("Search cleared.", "info");
+    }
+
+
+    /* ---------------------- THEME & SOUND ---------------------- */
+    function cycleTheme() {
+      themeIdx = (themeIdx + 1) % themes.length;
+      const newTheme = themes[themeIdx];
+      document.documentElement.setAttribute("data-theme", newTheme);
+      localStorage.setItem("sp_theme", newTheme);
+
+      const themeButton = document.getElementById("themeBtn");
+      let icon = ''; // Default for safety
+      if (newTheme === 'light') icon = '☀️';
+      else if (newTheme === 'dark') icon = '🌙';
+      else if (newTheme === 'sepia') icon = '📖';
+      else if (newTheme === 'neon') icon = '✨';
+
+      themeButton.innerHTML = `<span class="theme-icon">${icon}</span>`; // Set icon directly
+      themeButton.setAttribute("data-tooltip", `Theme: ${newTheme.charAt(0).toUpperCase() + newTheme.slice(1)}`);
+      showToast(`Theme changed to ${newTheme}`, "info");
+    }
+    function applySavedTheme() {
+      const t = localStorage.getItem("sp_theme") || "light";
+      themeIdx = themes.indexOf(t);
+      if (themeIdx < 0) themeIdx = 0; // Fallback to light if not found
+      document.documentElement.setAttribute("data-theme", themes[themeIdx]);
+
+      const themeButton = document.getElementById("themeBtn");
+      let icon = ''; // Default for safety
+      if (themes[themeIdx] === 'light') icon = '☀️';
+      else if (themes[themeIdx] === 'dark') icon = '🌙';
+      else if (themes[themeIdx] === 'sepia') icon = '📖';
+      else if (themes[themeIdx] === 'neon') icon = '✨';
+
+      themeButton.innerHTML = `<span class="theme-icon">${icon}</span>`; // Set icon directly
+      themeButton.setAttribute("data-tooltip", `Theme: ${themes[themeIdx].charAt(0).toUpperCase() + themes[themeIdx].slice(1)}`);
+    }
+    function toggleSounds() {
+      soundsEnabled = !soundsEnabled;
+      const soundBtn = document.querySelector('nav button[aria-label="Toggle sounds"]');
+      if (soundsEnabled) {
+          soundBtn.textContent = '🔊';
+          soundBtn.setAttribute('data-tooltip', 'Sounds On');
+          showToast("Sounds On", "success");
+      } else {
+          soundBtn.textContent = '🔇';
+          soundBtn.setAttribute('data-tooltip', 'Sounds Off');
+          showToast("Sounds Off", "info");
+      }
+    }
+
+    /* ---------------------- NEW: SETTINGS BUTTONS LOGIC ---------------------- */
+    function initializeSettingButtons() {
+        const autoplayBtn = document.getElementById('autoplayBtn');
+        autoplayBtn.textContent = `Autoplay: ${autoplayEnabled ? 'ON' : 'OFF'}`;
+        autoplayBtn.classList.toggle('active', autoplayEnabled);
+
+        const compactViewBtn = document.getElementById('compactViewBtn');
+        compactViewBtn.textContent = `Compact View: ${compactViewEnabled ? 'ON' : 'OFF'}`;
+        compactViewBtn.classList.toggle('active', compactViewEnabled);
+        toggleCompactClass(compactViewEnabled); // Apply class immediately on load
+
+        const blurNsfwBtn = document.getElementById('blurNsfwBtn');
+        blurNsfwBtn.textContent = `Blur NSFW: ${blurNsfwEnabled ? 'ON' : 'OFF'}`;
+        blurNsfwBtn.classList.toggle('active', blurNsfwEnabled);
+        // Implement actual NSFW blurring logic here if you have NSFW content detection
+    }
+
+    function toggleAutoplay() {
+        autoplayEnabled = !autoplayEnabled;
+        const btn = document.getElementById('autoplayBtn');
+        btn.textContent = `Autoplay: ${autoplayEnabled ? 'ON' : 'OFF'}`;
+        btn.classList.toggle('active', autoplayEnabled);
+        localStorage.setItem('sp_autoplay', autoplayEnabled);
+
+        // Apply/remove autoplay to all current video elements
+        document.querySelectorAll('.gallery video').forEach(video => {
+            if (autoplayEnabled) {
+                video.autoplay = true;
+                video.loop = true;
+                video.muted = true; // Keep muted for gallery view for better UX
+                video.play().catch(e => console.error("Autoplay failed:", e)); // Autoplay might be blocked by browser
+            } else {
+                video.autoplay = false;
+                video.loop = false;
+                video.pause();
+            }
+        });
+        showToast(`Autoplay ${autoplayEnabled ? 'enabled' : 'disabled'}`, "info");
+    }
+
+    // New main function for compact view button
+    function toggleCompact() {
+        compactViewEnabled = !compactViewEnabled;
+        const btn = document.getElementById('compactViewBtn');
+        btn.textContent = `Compact View: ${compactViewEnabled ? 'ON' : 'OFF'}`;
+        btn.classList.toggle('active', compactViewEnabled);
+        localStorage.setItem('sp_compactView', compactViewEnabled);
+        toggleCompactClass(compactViewEnabled); // Call helper to apply/remove classes
+        showToast(`Compact view ${compactViewEnabled ? 'enabled' : 'disabled'}`, "info");
+    }
+
+    // Helper function that actually applies/removes the compact class
+    function toggleCompactClass(isCompact) {
+        document.getElementById("gallery").classList.toggle("compact", isCompact);
+        document.getElementById("favGallery").classList.toggle("compact", isCompact);
+    }
+
+    function toggleBlurNsfw() {
+        blurNsfwEnabled = !blurNsfwEnabled;
+        const btn = document.getElementById('blurNsfwBtn');
+        btn.textContent = `Blur NSFW: ${blurNsfwEnabled ? 'ON' : 'OFF'}`;
+        btn.classList.toggle('active', blurNsfwEnabled);
+        localStorage.setItem('sp_blurNsfw', blurNsfwEnabled);
+        // For actual blur, you'd need to:
+        // 1. Have a mechanism to identify NSFW content (e.g., API tags, local data).
+        // 2. Apply/remove a CSS class to relevant `.item` or `img/video` elements.
+        // Example: document.querySelectorAll('.item.nsfw').forEach(el => el.classList.toggle('blurred', blurNsfwEnabled));
+        showToast(`Blur NSFW ${blurNsfwEnabled ? 'enabled' : 'disabled'}`, "info");
+    }
+
+    /* ---------------------- PWA & NOTIFICATIONS ---------------------- */
+    let deferredPrompt; // To store the event for later use
+
+    function registerPWA() {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("sw.js")
+            .then(reg => console.log("Service Worker registered!", reg))
+            .catch(err => console.error("Service Worker registration failed:", err));
+      }
+
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferredPrompt = e; // Store the event
+        const btn = document.getElementById("installBtn");
+        btn.style.display = "inline"; // Show install button
+        btn.onclick = () => {
+          if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then((choiceResult) => {
+              if (choiceResult.outcome === "accepted") {
+                showToast("App installed successfully!", "success");
+                btn.style.display = "none"; // Hide install button after install
+              } else {
+                showToast("App installation cancelled.", "info");
+              }
+              deferredPrompt = null; // Clear the prompt
+            });
+          }
+        };
+      });
+
+      window.addEventListener('appinstalled', () => {
+          document.getElementById("installBtn").style.display = 'none'; // Hide button if already installed
+          showToast("Shady Photo is ready to use offline!", "success");
+      });
+    }
+
+    function checkNewContent() {
+        if (!("Notification" in window)) {
+            console.log("This browser does not support notifications.");
+            return;
+        }
+
+        if (Notification.permission === "default") {
+            Notification.requestPermission()
+                .then(permission => {
+                    if (permission === "granted") {
+                        triggerNewContentNotification();
+                    }
+                });
+        } else if (Notification.permission === "granted") {
+            triggerNewContentNotification();
+        }
+    }
+
+    function triggerNewContentNotification() {
+        // In a real app, you'd fetch data to see if there's genuinely new content
+        // For this demo, we'll just send a notification sometimes
+        const lastNotified = localStorage.getItem('lastNotificationTime');
+        const now = Date.now();
+        const oneHour = 60 * 60 * 1000; // 1 hour
+
+        if (!lastNotified || (now - lastNotified) > oneHour) { // Notify roughly every hour
+            new Notification("Shady Photo", {
+                body: "New trending media waiting for you! ✨",
+                icon: 'https://www.google.com/s2/favicons?domain=pexels.com', // Path to your app icon
+                vibrate: [200, 100, 200]
+            });
+            localStorage.setItem('lastNotificationTime', now);
+        }
+    }
+
+
+    /* ---------------------- TAB NAV ---------------------- */
+    function switchTab(id, event) {
+      document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
+      document.getElementById(id).classList.add("active");
+
+      document.querySelectorAll("nav button").forEach(btn => btn.classList.remove("active-tab"));
+      if (event && event.currentTarget) {
+        event.currentTarget.classList.add("active-tab");
+      } else {
+        // Fallback for initial load or programmatic call
+        // Find the correct button by its onclick attribute or text content
+        const navButtons = document.querySelectorAll('nav button');
+        for (const btn of navButtons) {
+            if (btn.onclick && btn.onclick.toString().includes(`switchTab('${id}'`)) {
+                btn.classList.add('active-tab');
+                break;
+            }
+        }
+      }
+
+      // Re-render favorites/history if their tabs are activated
+      if (id === 'favorites') renderFavorites();
+      if (id === 'history') renderHistory();
+    }
+  </script>
+</body>
+</html>
